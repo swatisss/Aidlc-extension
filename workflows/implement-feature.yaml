@@ -1,0 +1,53 @@
+id: implement-feature
+name: Implement a feature
+icon: "✨"
+description: Clarify → explore → design → implement → test & review, with approval gates before designing and before merging.
+artifactRoot: "{{docsFolder}}/features/{{runId}}"
+inputs:
+  - id: feature
+    label: Describe the feature (link an issue or paste acceptance criteria if you have them)
+    type: multiline
+  - id: constraints
+    label: Constraints or preferences (optional)
+    type: multiline
+    required: false
+stages:
+  - id: clarify
+    name: Clarify requirements
+    prompt: implement-feature/clarify.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [spec.md]
+    gate: true
+  - id: explore
+    name: Explore codebase
+    prompt: implement-feature/explore.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [exploration.md]
+    gate: false
+  - id: design
+    name: Design & plan
+    prompt: implement-feature/design.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [design.md]
+    gate: true
+  - id: implement
+    name: Implement
+    prompt: implement-feature/implement.md
+    tools: [Read, Glob, Grep, Edit, Write]
+    gate: true
+  - id: test-review
+    name: Test & self-review
+    prompt: implement-feature/test-review.md
+    tools: [Read, Glob, Grep, Edit, Write]
+    artifacts: [review.md]
+    gate: true
+  - id: summary
+    name: Summary
+    prompt: implement-feature/summary.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [summary.md]
+    gate: false

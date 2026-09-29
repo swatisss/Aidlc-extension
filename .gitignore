@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.vsix
+.aidlc/runs/
+.vscode-test/
+dist-test/
+.vsd/

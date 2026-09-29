@@ -1,0 +1,80 @@
+id: legacy-migration
+name: Legacy code migration
+icon: "🏗️"
+description: Understand → document → pin behaviour with characterization tests → plan incremental slices → migrate slice by slice → verify.
+artifactRoot: "{{docsFolder}}/migration"
+inputs:
+  - id: sourceStack
+    label: Current (legacy) stack, e.g. "AngularJS 1.5 + jQuery", "Python 2.7 / Django 1.8", "Java 8 EJB"
+    type: text
+  - id: targetStack
+    label: Target stack, e.g. "React 19 + TypeScript", "Python 3.13 / Django 5", "Spring Boot 3"
+    type: text
+  - id: scope
+    label: Scope (repo-relative path, or "." for everything)
+    type: text
+    default: "."
+  - id: constraints
+    label: Constraints (downtime, deadlines, must-keep APIs, compliance…) — optional
+    type: multiline
+    required: false
+stages:
+  # ---- Understand ----
+  - id: discovery
+    name: Discovery & inventory
+    phase: understand
+    prompt: legacy-migration/discovery.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [01-discovery.md]
+    gate: true
+  - id: reverse-engineer
+    name: Reverse-engineer business rules
+    phase: understand
+    prompt: legacy-migration/reverse-engineer.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [02-business-rules.md]
+    gate: true
+  # ---- Safety net ----
+  - id: characterization-tests
+    name: Characterization tests
+    phase: safety net
+    prompt: legacy-migration/characterization-tests.md
+    tools: [Read, Glob, Grep, Write, Edit]
+    artifacts: [03-characterization-tests.md]
+    gate: true
+  # ---- Plan ----
+  - id: strategy
+    name: Target architecture & strategy
+    phase: plan
+    prompt: legacy-migration/strategy.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [04-strategy.md]
+    gate: true
+  - id: plan
+    name: Migration plan (slices)
+    phase: plan
+    prompt: legacy-migration/plan.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [05-migration-plan.md]
+    gate: true
+  # ---- Migrate ----
+  - id: migrate-slice
+    name: Migrate slice
+    phase: migrate
+    prompt: legacy-migration/migrate-slice.md
+    tools: [Read, Glob, Grep, Edit, Write]
+    artifacts: [06-migration-log.md]
+    gate: true
+    repeat: true
+  # ---- Verify ----
+  - id: verify
+    name: Verification report
+    phase: verify
+    prompt: legacy-migration/verify.md
+    tools: [Read, Glob, Grep]
+    artifacts: [07-verification-report.md]
+    gate: true

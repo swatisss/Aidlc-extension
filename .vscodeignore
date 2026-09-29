@@ -1,0 +1,13 @@
+.vscode/**
+src/**
+test/**
+**/*.map
+esbuild.mjs
+vitest.config.mjs
+tsconfig.json
+.aidlc/**
+aidlc-docs/**
+test-integration/**
+dist-test/**
+.vscode-test/**
+.vsd/**

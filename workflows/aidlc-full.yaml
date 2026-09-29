@@ -1,0 +1,87 @@
+id: aidlc-full
+name: Full AIDLC
+icon: "🔁"
+description: Inception → Construction → Operations with a human approval gate after each stage. Artifacts land in the AIDLC docs folder.
+inputs:
+  - id: requirement
+    label: What do you want to build or change?
+    type: multiline
+  - id: projectType
+    label: Project type
+    type: choice
+    options: [Auto-detect, Greenfield (new project), Brownfield (existing codebase)]
+stages:
+  # ---- Inception: what and why ----
+  - id: workspace-detection
+    name: Workspace detection
+    phase: inception
+    prompt: aidlc-full/workspace-detection.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [inception/workspace-analysis.md]
+    gate: false
+  - id: requirements
+    name: Requirements analysis
+    phase: inception
+    prompt: aidlc-full/requirements.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [inception/requirements.md]
+    gate: true
+  - id: user-stories
+    name: User stories
+    phase: inception
+    prompt: aidlc-full/user-stories.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [inception/user-stories.md]
+    gate: true
+  - id: application-design
+    name: Application design
+    phase: inception
+    prompt: aidlc-full/application-design.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [inception/application-design.md]
+    gate: true
+  - id: units-of-work
+    name: Units of work
+    phase: inception
+    prompt: aidlc-full/units-of-work.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [inception/units-of-work.md]
+    gate: true
+  # ---- Construction: how, one unit at a time ----
+  - id: functional-design
+    name: Functional design
+    phase: construction
+    prompt: aidlc-full/functional-design.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [construction/functional-design.md]
+    gate: true
+  - id: code-generation
+    name: Code generation (per unit)
+    phase: construction
+    prompt: aidlc-full/code-generation.md
+    tools: [Read, Glob, Grep, Edit, Write]
+    artifacts: [construction/code-generation-log.md]
+    gate: true
+    repeat: true
+  - id: build-and-test
+    name: Build and test
+    phase: construction
+    prompt: aidlc-full/build-and-test.md
+    tools: [Read, Glob, Grep, Edit, Write, Bash]
+    artifacts: [construction/build-and-test.md]
+    gate: true
+  # ---- Operations ----
+  - id: operations
+    name: Deployment & operations
+    phase: operations
+    prompt: aidlc-full/operations.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit]
+    artifacts: [operations/deployment.md]
+    gate: true

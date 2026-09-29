@@ -1,0 +1,69 @@
+id: generate-docs
+name: Generate documentation
+icon: "📚"
+description: Read-only analysis that writes architecture, module, API and onboarding docs (with Mermaid diagrams). Re-runs only regenerate what changed.
+artifactRoot: "{{outputFolder}}"
+trackGitSha: true
+inputs:
+  - id: scope
+    label: Scope (repo-relative folder or file; "." for the whole repo)
+    type: text
+    default: "."
+  - id: audience
+    label: Primary audience
+    type: choice
+    options: [Developer onboarding, API reference, Architecture overview, All of the above]
+  - id: outputFolder
+    label: Output folder
+    type: text
+    default: docs
+# Read-only: the agent can only write through write_artifact, which is confined to the output folder.
+stages:
+  - id: discovery
+    name: Discovery & doc plan
+    phase: analyse
+    prompt: generate-docs/discovery.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit, Bash]
+    artifacts: [_doc-plan.md]
+    gate: true
+  - id: architecture
+    name: Architecture overview
+    phase: write
+    prompt: generate-docs/architecture.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit, Bash]
+    artifacts: [architecture.md]
+    gate: false
+  - id: modules
+    name: Module docs
+    phase: write
+    prompt: generate-docs/modules.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit, Bash]
+    artifacts: [modules/]
+    gate: false
+  - id: api-reference
+    name: API reference
+    phase: write
+    prompt: generate-docs/api-reference.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit, Bash]
+    artifacts: [api-reference.md]
+    gate: false
+  - id: onboarding
+    name: Onboarding guide
+    phase: write
+    prompt: generate-docs/onboarding.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit, Bash]
+    artifacts: [onboarding.md]
+    gate: false
+  - id: review
+    name: Review & index
+    phase: review
+    prompt: generate-docs/review.md
+    tools: [Read, Glob, Grep]
+    deny: [Edit, Write, NotebookEdit, Bash]
+    artifacts: [README.md]
+    gate: true
