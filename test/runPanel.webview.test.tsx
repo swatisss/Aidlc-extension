@@ -51,11 +51,11 @@ function view(over: Partial<RunView> & { status?: RunView['run']['status'] } = {
       ],
     },
     events: [
-      { kind: 'info', text: '▶ Migrate slice (iteration 2)' },
-      { kind: 'text', text: 'Looking at the **module**…' },
-      { kind: 'tool_use', id: 't1', name: 'mcp__aidlc__write_artifact', input: '{"path":"migration/06-migration-log.md"}' },
-      { kind: 'tool_result', id: 't1', isError: false, text: 'Wrote it' },
-      { kind: 'tool_use', id: 't2', name: 'Read', input: '{"file_path":"/repo/cobol/PAYROLL01.cbl"}' },
+      { seq: 1, kind: 'info', text: '▶ Migrate slice (iteration 2)' },
+      { seq: 2, kind: 'text', text: 'Looking at the **module**…' },
+      { seq: 3, kind: 'tool_use', id: 't1', name: 'mcp__aidlc__write_artifact', input: '{"path":"migration/06-migration-log.md"}' },
+      { seq: 4, kind: 'tool_result', id: 't1', isError: false, text: 'Wrote it' },
+      { seq: 5, kind: 'tool_use', id: 't2', name: 'Read', input: '{"file_path":"/repo/cobol/PAYROLL01.cbl"}' },
     ],
     ...rest,
   };
@@ -122,7 +122,7 @@ describe('run panel webview', () => {
     expect(text()).toContain('Read cobol/PAYROLL01.cbl');
     expect(document.querySelector('.feed-text strong')?.textContent).toBe('module');
     expect(text()).toContain('The agent is waiting for you');
-    hostSends({ type: 'event', event: { kind: 'text', text: 'Live update 42' } });
+    hostSends({ type: 'event', event: { seq: 6, kind: 'text', text: 'Live update 42' } });
     await waitFor(() => expect(text()).toContain('Live update 42'));
   });
 

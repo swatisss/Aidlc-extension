@@ -1,5 +1,5 @@
 import type { Options } from '@anthropic-ai/claude-agent-sdk';
-import type { AgentEvent } from '../shared/types';
+import type { AgentEventKind } from '../shared/types';
 import { CODEGRAPH_SERVER, CODEGRAPH_TOOL_NAMES, type CodeGraph } from './codegraph';
 import { makeCanUseTool } from './permissions';
 import type { AgentBackend, StageRequest, StageResult } from './runner';
@@ -36,17 +36,21 @@ export class SdkBackend implements AgentBackend {
     return this.sdk;
   }
 
-  async runStage(req: StageRequest, onEvent: (e: AgentEvent) => void): Promise<StageResult> {
+  async runStage(req: StageRequest, onEvent: (e: AgentEventKind) => void): Promise<StageResult> {
     const sdk = await this.loadSdk();
     const abortController = new AbortController();
     req.signal.addEventListener('abort', () => abortController.abort(), { once: true });
+
+    // Resolved once per stage rather than separately by codegraph prepare/mcpConfig and the SDK options
+    // below — each call reads secret storage (an OS keychain round trip), which isn't free.
+    const env = await this.cfg.env();
 
     // Sync the index before every stage so it reflects edits made by earlier stages.
     const mcpServers: NonNullable<Options['mcpServers']> = { [AIDLC_SERVER]: createAidlcServer(sdk, req.host) };
     const allowedTools = [...req.stage.tools, ...AIDLC_TOOL_NAMES];
     const cg = this.cfg.codegraph?.();
-    if (cg && (await cg.prepare(onEvent))) {
-      mcpServers[CODEGRAPH_SERVER] = await cg.mcpConfig();
+    if (cg && (await cg.prepare(onEvent, env))) {
+      mcpServers[CODEGRAPH_SERVER] = cg.mcpConfig(env);
       allowedTools.push(...CODEGRAPH_TOOL_NAMES);
     }
     if (req.signal.aborted) return { costUsd: 0, isError: false, text: 'aborted' };
@@ -55,8 +59,8 @@ export class SdkBackend implements AgentBackend {
       prompt: req.prompt,
       options: {
         cwd: req.cwd,
-        env: await this.cfg.env(),
-        model: this.cfg.model,
+        env,
+        model: req.stage.model ?? this.cfg.model,
         maxTurns: this.cfg.maxTurns,
         maxBudgetUsd: this.cfg.maxBudgetUsd,
         systemPrompt: { type: 'preset', preset: 'claude_code', append: req.systemAppend },

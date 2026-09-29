@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { AgentEvent, HostToPanel, PanelToHost, PendingPermission, PendingQuestion, RunView, StageState } from '../shared/types';
 import { describeRequest, describeTool, formatUsd, ProgressBar, StatusBadge } from './components';
@@ -91,9 +91,54 @@ function Header({ view }: { view: RunView }) {
 
 // ---------- activity ----------
 
+type ToolResultEvent = Extract<AgentEvent, { kind: 'tool_result' }>;
+
+/** One feed row. Memoized so a new event appended to the feed doesn't reconcile every earlier row. */
+const EventRow = memo(function EventRow({ event: e, result: r, working }: { event: AgentEvent; result?: ToolResultEvent; working: boolean }) {
+  switch (e.kind) {
+    case 'text':
+      return (
+        <div className="feed-text">
+          <span className="avatar">✦</span>
+          <Markdown text={e.text} />
+        </div>
+      );
+    case 'tool_use': {
+      const d = describeTool(e.name, e.input);
+      return (
+        <details className={`feed-tool ${r?.isError ? 'error' : ''}`}>
+          <summary>
+            <span className="icon">{d.icon}</span>
+            <span className="ellipsis">{d.label}</span>
+            {r?.isError && <span className="chip error">error</span>}
+            {!r && working && <span className="spinner" />}
+          </summary>
+          <div className="tool-detail">
+            <div className="muted small">{e.name}</div>
+            <pre>{e.input}</pre>
+            {r && <pre className={r.isError ? 'error' : ''}>{r.text}</pre>}
+          </div>
+        </details>
+      );
+    }
+    case 'tool_result':
+      return null;
+    case 'result':
+      return (
+        <div className={`feed-divider ${e.isError ? 'error' : ''}`}>
+          {e.isError ? 'Stage ended with an error' : 'Agent finished'} · {e.turns} turns · {formatUsd(e.costUsd)}
+        </div>
+      );
+    case 'info':
+      return e.text.startsWith('▶') ? <div className="feed-stage">{e.text.slice(1).trim()}</div> : <div className="feed-info">{e.text}</div>;
+    case 'error':
+      return <div className="feed-info error">{e.text}</div>;
+  }
+});
+
 function Activity({ events, working, waiting }: { events: AgentEvent[]; working: boolean; waiting: boolean }) {
   const results = useMemo(() => {
-    const m = new Map<string, Extract<AgentEvent, { kind: 'tool_result' }>>();
+    const m = new Map<string, ToolResultEvent>();
     for (const e of events) if (e.kind === 'tool_result') m.set(e.id, e);
     return m;
   }, [events]);
@@ -102,60 +147,11 @@ function Activity({ events, working, waiting }: { events: AgentEvent[]; working:
 
   return (
     <div className="feed">
-      {events.map((e, i) => {
-        switch (e.kind) {
-          case 'text':
-            return (
-              <div key={i} className="feed-text">
-                <span className="avatar">✦</span>
-                <Markdown text={e.text} />
-              </div>
-            );
-          case 'tool_use': {
-            const d = describeTool(e.name, e.input);
-            const r = results.get(e.id);
-            return (
-              <details key={i} className={`feed-tool ${r?.isError ? 'error' : ''}`}>
-                <summary>
-                  <span className="icon">{d.icon}</span>
-                  <span className="ellipsis">{d.label}</span>
-                  {r?.isError && <span className="chip error">error</span>}
-                  {!r && working && <span className="spinner" />}
-                </summary>
-                <div className="tool-detail">
-                  <div className="muted small">{e.name}</div>
-                  <pre>{e.input}</pre>
-                  {r && <pre className={r.isError ? 'error' : ''}>{r.text}</pre>}
-                </div>
-              </details>
-            );
-          }
-          case 'tool_result':
-            return null;
-          case 'result':
-            return (
-              <div key={i} className={`feed-divider ${e.isError ? 'error' : ''}`}>
-                {e.isError ? 'Stage ended with an error' : 'Agent finished'} · {e.turns} turns · {formatUsd(e.costUsd)}
-              </div>
-            );
-          case 'info':
-            return e.text.startsWith('▶') ? (
-              <div key={i} className="feed-stage">
-                {e.text.slice(1).trim()}
-              </div>
-            ) : (
-              <div key={i} className="feed-info">
-                {e.text}
-              </div>
-            );
-          case 'error':
-            return (
-              <div key={i} className="feed-info error">
-                {e.text}
-              </div>
-            );
-        }
-      })}
+      {events.map((e) =>
+        e.kind === 'tool_result' ? null : (
+          <EventRow key={e.seq} event={e} result={e.kind === 'tool_use' ? results.get(e.id) : undefined} working={working} />
+        ),
+      )}
       {working && !waiting && (
         <div className="feed-info pulse">
           <span className="spinner" /> Agent is working…

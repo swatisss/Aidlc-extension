@@ -24,6 +24,7 @@ stages:
     name: Discovery & inventory
     phase: understand
     prompt: legacy-migration/discovery.md
+    model: claude-sonnet-5 # mostly mechanical inventory-building; reserve Opus for stages below that need deep reasoning
     tools: [Read, Glob, Grep]
     deny: [Edit, Write, NotebookEdit]
     artifacts: [01-discovery.md]
@@ -41,6 +42,7 @@ stages:
     name: Characterization tests
     phase: safety net
     prompt: legacy-migration/characterization-tests.md
+    model: claude-sonnet-5 # mechanical: follows the repo's existing test framework/patterns
     tools: [Read, Glob, Grep, Write, Edit]
     artifacts: [03-characterization-tests.md]
     gate: true
@@ -67,7 +69,7 @@ stages:
     phase: migrate
     prompt: legacy-migration/migrate-slice.md
     tools: [Read, Glob, Grep, Edit, Write]
-    artifacts: [06-migration-log.md]
+    artifacts: [06-migration-log/]
     gate: true
     repeat: true
   # ---- Verify ----
@@ -75,6 +77,7 @@ stages:
     name: Verification report
     phase: verify
     prompt: legacy-migration/verify.md
+    model: claude-sonnet-5 # mechanical: runs existing commands/tests and reports results
     tools: [Read, Glob, Grep]
     artifacts: [07-verification-report.md]
     gate: true

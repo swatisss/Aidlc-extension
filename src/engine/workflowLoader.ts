@@ -68,6 +68,7 @@ export function parseWorkflow(text: string, source = '<inline>'): WorkflowDef {
       name: str(o.name, `stages[${idx}].name`),
       phase: typeof o.phase === 'string' ? o.phase : undefined,
       prompt: str(o.prompt, `stages[${idx}].prompt`),
+      model: typeof o.model === 'string' ? o.model : undefined,
       tools: strList(o.tools, `stages[${idx}].tools`),
       deny: strList(o.deny, `stages[${idx}].deny`),
       artifacts: strList(o.artifacts, `stages[${idx}].artifacts`),

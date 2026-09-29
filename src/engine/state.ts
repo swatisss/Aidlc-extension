@@ -30,17 +30,21 @@ export class RunStore {
     for (const f of fs.readdirSync(this.dir)) {
       if (!f.endsWith('.json')) continue;
       try {
-        const run = JSON.parse(fs.readFileSync(path.join(this.dir, f), 'utf8')) as RunState;
-        if (run.status === 'running' || run.status === 'awaiting_input') {
-          run.status = 'paused';
-          const st = run.stages[run.currentStage];
-          if (st?.status === 'running') st.status = 'pending';
-        }
-        runs.push(run);
+        runs.push(normalize(JSON.parse(fs.readFileSync(path.join(this.dir, f), 'utf8')) as RunState));
       } catch {
         // Ignore corrupt files rather than failing activation.
       }
     }
     return runs.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
+}
+
+/** A run left "running"/"awaiting_input" by a previous window can't still be that, so it comes back as "paused". */
+function normalize(run: RunState): RunState {
+  if (run.status === 'running' || run.status === 'awaiting_input') {
+    run.status = 'paused';
+    const st = run.stages[run.currentStage];
+    if (st?.status === 'running') st.status = 'pending';
+  }
+  return run;
 }

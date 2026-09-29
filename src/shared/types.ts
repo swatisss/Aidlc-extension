@@ -16,6 +16,8 @@ export type StageDef = {
   phase?: string;
   /** Path of the stage prompt, relative to the prompts/ folder. */
   prompt: string;
+  /** Model for this stage; falls back to the workspace's aidlc.model setting when unset. */
+  model?: string;
   /** Tools auto-approved for this stage (SDK allowedTools). */
   tools: string[];
   /** Tools that are never available in this stage (SDK disallowedTools). */
@@ -129,14 +131,17 @@ export type QuestionSpec = {
   multiSelect?: boolean;
 };
 
-/** A live event produced while a stage runs. Not persisted. */
-export type AgentEvent =
+/** The event shapes producers (agentSession, codegraph) construct, before the runner stamps `seq`. */
+export type AgentEventKind =
   | { kind: 'text'; text: string }
   | { kind: 'tool_use'; id: string; name: string; input: string }
   | { kind: 'tool_result'; id: string; isError: boolean; text: string }
   | { kind: 'result'; costUsd: number; turns: number; isError: boolean; text: string }
   | { kind: 'info'; text: string }
   | { kind: 'error'; text: string };
+
+/** A live event produced while a stage runs. Not persisted. `seq` is a stable React list key. */
+export type AgentEvent = AgentEventKind & { seq: number };
 
 export type PendingQuestion = { requestId: string; questions: QuestionSpec[] };
 export type PendingPermission = { requestId: string; toolName: string; input: string };

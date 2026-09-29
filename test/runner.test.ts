@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { newRun, upsertById, WorkflowRunner, type AgentBackend, type StageRequest, type StageResult } from '../src/engine/runner';
 import { RunStore } from '../src/engine/state';
 import { parseWorkflow } from '../src/engine/workflowLoader';
-import type { AgentEvent } from '../src/shared/types';
+import type { AgentEventKind } from '../src/shared/types';
 
 const WF = parseWorkflow(`
 id: t
@@ -30,13 +30,13 @@ stages:
     gate: false
 `);
 
-type Script = (req: StageRequest, emit: (e: AgentEvent) => void) => Promise<StageResult>;
+type Script = (req: StageRequest, emit: (e: AgentEventKind) => void) => Promise<StageResult>;
 
 /** Fake SDK backend: each call runs the next scripted behaviour (or a default that approves). */
 class FakeBackend implements AgentBackend {
   calls: StageRequest[] = [];
   scripts: Script[] = [];
-  async runStage(req: StageRequest, emit: (e: AgentEvent) => void): Promise<StageResult> {
+  async runStage(req: StageRequest, emit: (e: AgentEventKind) => void): Promise<StageResult> {
     this.calls.push(req);
     const script = this.scripts.shift();
     if (script) return script(req, emit);

@@ -11,12 +11,20 @@ import type { AgentEvent, RunState, RunSummary, WorkflowDef, WorkflowSummary } f
 type Settings = { docsFolder: string; autoApprove: boolean };
 
 /** Owns every run in the workspace: creates runners, rehydrates persisted runs, fans out change events. */
+type DebounceEntry = { timer: ReturnType<typeof setTimeout>; dirty: boolean };
+
+/** How long to coalesce a burst of same-run changes (e.g. many tool calls in one stage) into one UI repost. */
+const CHANGE_DEBOUNCE_MS = 150;
+
 export class RunManager implements vscode.Disposable {
   private readonly runners = new Map<string, WorkflowRunner>();
   private workflows: WorkflowDef[] = [];
   private readonly store: RunStore;
   private readonly changeEmitter = new vscode.EventEmitter<string | undefined>();
   private readonly eventEmitter = new vscode.EventEmitter<{ runId: string; event: AgentEvent }>();
+  /** Runs read from disk, cached between persists so listRuns()/runner() don't re-scan .aidlc/runs/ on every call. */
+  private cachedStored?: RunState[];
+  private readonly changeDebounce = new Map<string | undefined, DebounceEntry>();
   /** Fires with a runId when that run changed, or undefined when the list/workflows changed. */
   readonly onDidChange = this.changeEmitter.event;
   readonly onDidEvent = this.eventEmitter.event;
@@ -52,7 +60,7 @@ export class RunManager implements vscode.Disposable {
 
   listRuns(): RunSummary[] {
     const live = new Map([...this.runners.values()].map((r) => [r.run.id, r.run]));
-    const stored = this.store.list().map((r) => live.get(r.id) ?? r);
+    const stored = this.refreshStored().map((r) => live.get(r.id) ?? r);
     return stored.map((r) => {
       const inv = r.inventory ?? [];
       return {
@@ -81,7 +89,7 @@ export class RunManager implements vscode.Disposable {
   runner(runId: string): WorkflowRunner | undefined {
     const existing = this.runners.get(runId);
     if (existing) return existing;
-    const run = this.store.list().find((r) => r.id === runId);
+    const run = this.refreshStored().find((r) => r.id === runId);
     const wf = run && this.workflow(run.workflowId);
     if (!run || !wf) return undefined;
     return this.createRunner(wf, run, {});
@@ -93,6 +101,7 @@ export class RunManager implements vscode.Disposable {
     const vars = wf.trackGitSha ? await this.incrementalVars(wf) : {};
     const run = newRun(wf, inputs);
     const runner = this.createRunner(wf, run, vars);
+    this.cachedStored = undefined;
     this.changeEmitter.fire(undefined);
     // Run in the background; the UI follows along through events.
     void runner.start();
@@ -101,6 +110,7 @@ export class RunManager implements vscode.Disposable {
 
   dispose(): void {
     for (const r of this.runners.values()) r.stop();
+    for (const e of this.changeDebounce.values()) clearTimeout(e.timer);
     this.changeEmitter.dispose();
     this.eventEmitter.dispose();
   }
@@ -120,12 +130,42 @@ export class RunManager implements vscode.Disposable {
       promptsDir: path.join(this.extensionDir, 'prompts'),
       autoApprove,
       vars,
-      onChange: () => this.changeEmitter.fire(run.id),
+      onChange: () => this.fireChange(run.id),
       onEvent: (event) => this.eventEmitter.fire({ runId: run.id, event }),
       onComplete: wf.trackGitSha ? () => this.recordSha(wf) : undefined,
     });
     this.runners.set(run.id, runner);
     return runner;
+  }
+
+  /** `store.list()`, cached until the next persisted change in this window. */
+  private refreshStored(): RunState[] {
+    this.cachedStored ??= this.store.list();
+    return this.cachedStored;
+  }
+
+  /**
+   * Fire onDidChange for a run, coalescing a burst (e.g. many tool calls in one stage) into
+   * one immediate (leading) fire plus at most one trailing fire once the burst settles. The
+   * disk write in persist() already happened synchronously before this is called; only the
+   * UI-facing notification is debounced.
+   */
+  private fireChange(runId: string | undefined): void {
+    this.cachedStored = undefined;
+    const entry = this.changeDebounce.get(runId);
+    if (entry) {
+      entry.dirty = true;
+      return;
+    }
+    this.changeEmitter.fire(runId);
+    const e: DebounceEntry = {
+      dirty: false,
+      timer: setTimeout(() => {
+        this.changeDebounce.delete(runId);
+        if (e.dirty) this.changeEmitter.fire(runId);
+      }, CHANGE_DEBOUNCE_MS),
+    };
+    this.changeDebounce.set(runId, e);
   }
 
   private shaFile(wf: WorkflowDef): string {

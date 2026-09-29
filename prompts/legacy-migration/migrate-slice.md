@@ -1,15 +1,22 @@
 # Stage: Migrate slice — iteration {{iteration}}
 
-Earlier artifacts (read these first):
+Every file written so far in this run:
 {{previousArtifacts}}
 
-Read `06-migration-log.md` if it exists: it lists the slices already done. Take the **next slice** from `05-migration-plan.md`, and migrate **only that slice**.
+You don't need to re-read all of these every iteration — they don't change once approved. For this slice you'll typically only need:
+- `05-migration-plan.md`, to find the next slice and its dependencies;
+- `02-business-rules.md`, only the BR ids this slice maps to;
+- `04-strategy.md`, only the decisions that bear on this slice.
+
+Skip `01-discovery.md` and `03-characterization-tests.md` unless something is genuinely unclear — you already have what you need from them via the plan and the tests you're keeping green.
+
+Find the **next unchecked slice** from the checklist in `05-migration-plan.md` (or `{{docsFolder}}/aidlc-state.md`) and migrate **only that slice**. Don't read every earlier slice's log entry to figure out what's done — the checklist alone tells you.
 
 1. Implement the slice in {{targetStack}}, following the strategy: adapters, flags and coexistence rules. Preserve every business rule mapped to this slice. Keep the characterization tests passing, and don't weaken them to make them pass.
 2. Remove or retire the legacy code only when the plan says this slice owns its removal.
 3. If the slice turns out bigger or riskier than planned, stop and ask via `ask_user_question` whether to split it.
 4. Bash isn't pre-approved in this stage. If you need to run the tests or the build, request it; the reviewer approves each command. Otherwise, list the exact commands the reviewer should run.
-5. Update `06-migration-log.md` using `write_artifact`. Rewrite the whole file, keeping the earlier entries, and add this slice with:
+5. Write **only this slice's own log entry** as a new file `06-migration-log/{{iteration}}-<slice-id>.md` using `write_artifact`. Don't read or rewrite earlier slices' log files — each slice's entry is independent. Include:
    - the files changed
    - the rules preserved
    - the test status

@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   AgentEvent,
+  AgentEventKind,
   InventoryItem,
   TraceEntry,
   PendingPermission,
@@ -57,7 +58,7 @@ export type StageResult = { sessionId?: string; costUsd: number; isError: boolea
 
 /** Abstraction over the Claude Agent SDK so the runner can be tested without it. */
 export interface AgentBackend {
-  runStage(req: StageRequest, onEvent: (e: AgentEvent) => void): Promise<StageResult>;
+  runStage(req: StageRequest, onEvent: (e: AgentEventKind) => void): Promise<StageResult>;
 }
 
 export type RunnerOptions = {
@@ -107,6 +108,7 @@ export class WorkflowRunner {
   private pendingPermission?: PendingPermission & { resolve: (ok: boolean) => void };
   private approval?: Approval;
   private seq = 0;
+  private eventSeq = 0;
 
   constructor(private readonly o: RunnerOptions) {}
 
@@ -420,10 +422,11 @@ export class WorkflowRunner {
     }
   }
 
-  private emit(e: AgentEvent): void {
-    this.events.push(e);
+  private emit(e: AgentEventKind): void {
+    const stamped: AgentEvent = { ...e, seq: ++this.eventSeq };
+    this.events.push(stamped);
     if (this.events.length > MAX_EVENTS) this.events.splice(0, this.events.length - MAX_EVENTS);
-    this.o.onEvent(e);
+    this.o.onEvent(stamped);
   }
 
   private persist(): void {

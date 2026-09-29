@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { AgentEvent } from '../shared/types';
+import type { AgentEventKind } from '../shared/types';
 
 export const CODEGRAPH_SERVER = 'codegraph';
 /** CodeGraph's MCP surface is a single read-only tool, so it's safe to pre-approve in every stage. */
@@ -62,19 +62,23 @@ export class CodeGraph {
 
   /** Whether the CLI can be executed. Cached for the session. */
   available(): Promise<boolean> {
-    this.availability ??= this.launcher ? this.exec(['--version'], 5 * 60_000).then((r) => r.ok) : Promise.resolve(false);
+    this.availability ??= this.launcher
+      ? this.env()
+          .then((env) => this.exec(['--version'], 5 * 60_000, env))
+          .then((r) => r.ok)
+      : Promise.resolve(false);
     return this.availability;
   }
 
   /** Build the index on first use, otherwise sync it incrementally. Never throws. */
-  async prepare(onEvent: (e: AgentEvent) => void): Promise<boolean> {
+  async prepare(onEvent: (e: AgentEventKind) => void, env: Record<string, string>): Promise<boolean> {
     if (!(await this.available())) {
       this.warn(onEvent, 'CodeGraph could not be started, so this stage runs without the code graph (slower, more tokens).');
       return false;
     }
     const fresh = !fs.existsSync(path.join(this.cwd, '.codegraph', 'codegraph.db'));
     if (fresh) onEvent({ kind: 'info', text: 'CodeGraph: building the code index (first run in this workspace)…' });
-    const r = await this.exec(fresh ? ['init', '-y'] : ['sync', '-q'], 15 * 60_000);
+    const r = await this.exec(fresh ? ['init', '-y'] : ['sync', '-q'], 15 * 60_000, env);
     if (!r.ok) {
       this.warn(onEvent, `CodeGraph ${fresh ? 'indexing' : 'sync'} failed, so this stage runs without the code graph.\n${r.output.slice(-1500)}`);
       return false;
@@ -83,38 +87,37 @@ export class CodeGraph {
     return true;
   }
 
-  async mcpConfig(): Promise<McpStdioConfig> {
+  mcpConfig(env: Record<string, string>): McpStdioConfig {
     const l = this.launcher!;
     return {
       type: 'stdio',
       command: l.command,
       args: [...l.args, 'serve', '--mcp', '--path', this.cwd],
-      env: await this.fullEnv(),
+      env: this.fullEnv(env),
       // Keep the tool in the prompt rather than deferred behind ToolSearch; it's the one we want used first.
       alwaysLoad: true,
     };
   }
 
-  private warn(onEvent: (e: AgentEvent) => void, text: string): void {
+  private warn(onEvent: (e: AgentEventKind) => void, text: string): void {
     onEvent({ kind: 'error', text });
     if (!this.warned) this.onUnavailable?.(text.split('\n')[0]);
     this.warned = true;
   }
 
-  private async fullEnv(): Promise<Record<string, string>> {
-    const env = { ...(await this.env()), ...this.launcher?.env };
+  private fullEnv(base: Record<string, string>): Record<string, string> {
+    const env = { ...base, ...this.launcher?.env };
     // The extension runs CodeGraph on the user's behalf, so don't opt them into its
     // anonymous usage telemetry; an explicit CODEGRAPH_TELEMETRY in their env still wins.
     env.CODEGRAPH_TELEMETRY ??= '0';
     return env;
   }
 
-  private async exec(args: string[], timeout: number): Promise<{ ok: boolean; output: string }> {
+  private async exec(args: string[], timeout: number, env: Record<string, string>): Promise<{ ok: boolean; output: string }> {
     const l = this.launcher;
     if (!l) return { ok: false, output: 'CodeGraph is not installed with the extension.' };
-    const env = await this.fullEnv();
     return new Promise((resolve) => {
-      execFile(l.command, [...l.args, ...args], { cwd: this.cwd, env, timeout, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) =>
+      execFile(l.command, [...l.args, ...args], { cwd: this.cwd, env: this.fullEnv(env), timeout, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) =>
         resolve({ ok: !err, output: `${stdout}${stderr}` }),
       );
     });
